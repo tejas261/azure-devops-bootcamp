@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Namespace
+metadata: {name: s3}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: worker, namespace: s3}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: worker}}
+  template:
+    metadata: {labels: {app: worker}}
+    spec:
+      containers:
+        - name: worker
+          image: busybox:1.36
+          command: ["sh", "-c"]
+          args:
+            - 'test -n "$DB_HOST" || { echo "fatal: DB_HOST not set"; exit 1; }; echo connected to $DB_HOST; sleep 3600'

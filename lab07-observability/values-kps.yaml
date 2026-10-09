@@ -1,0 +1,13 @@
+# Small-footprint kube-prometheus-stack values for a 2-node B2ms cluster
+alertmanager:
+  enabled: true
+grafana:
+  adminPassword: change-me-now      # lab only; use a Secret in real life
+  resources: {requests: {cpu: 50m, memory: 128Mi}, limits: {memory: 256Mi}}
+prometheus:
+  prometheusSpec:
+    retention: 3d
+    resources: {requests: {cpu: 100m, memory: 512Mi}, limits: {memory: 1Gi}}
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false

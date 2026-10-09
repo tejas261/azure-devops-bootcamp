@@ -1,0 +1,66 @@
+#cloud-config
+# Plants 4 faults on an Ubuntu VM. Read nothing in this file before debugging if you want the real exercise.
+package_update: true
+packages: [nginx, lsof, htop, sysstat]
+write_files:
+  - path: /usr/local/bin/leak.sh
+    permissions: "0755"
+    content: |
+      #!/bin/bash
+      exec 3>/var/log/app/big.log
+      rm -f /var/log/app/big.log
+      dd if=/dev/zero bs=1M count=470 >&3 2>/dev/null
+      sleep infinity
+  - path: /etc/systemd/system/leaky.service
+    content: |
+      [Unit]
+      Description=app log writer
+      After=local-fs.target
+      RequiresMountsFor=/var/log/app
+      [Service]
+      ExecStart=/usr/local/bin/leak.sh
+      Restart=on-failure
+      [Install]
+      WantedBy=multi-user.target
+  - path: /opt/payments/worker.sh
+    permissions: "0644"
+    content: |
+      #!/bin/bash
+      while true; do echo "processing"; sleep 5; done
+  - path: /etc/systemd/system/payments-worker.service
+    content: |
+      [Unit]
+      Description=Payments worker
+      [Service]
+      ExecStart=/opt/payments/worker.sh
+      Restart=on-failure
+      RestartSec=3
+      [Install]
+      WantedBy=multi-user.target
+  - path: /etc/systemd/system/reportgen.service
+    content: |
+      [Unit]
+      Description=nightly report generator (runaway)
+      [Service]
+      ExecStart=/bin/sh -c 'while :; do :; done'
+      Restart=always
+      [Install]
+      WantedBy=multi-user.target
+runcmd:
+  - rm -f /etc/nginx/sites-enabled/default
+  - |
+    cat > /etc/nginx/conf.d/shop.conf <<'CONF'
+    server {
+        listen 80 default_server
+        server_name _;
+        location / { return 200 "shop ok\n"; }
+    }
+    CONF
+  - dd if=/dev/zero of=/opt/app.img bs=1M count=512
+  - mkfs.ext4 -q /opt/app.img
+  - mkdir -p /var/log/app
+  - mount -o loop /opt/app.img /var/log/app
+  - echo '/opt/app.img /var/log/app ext4 loop 0 0' >> /etc/fstab
+  - systemctl daemon-reload
+  - systemctl enable --now leaky.service reportgen.service payments-worker.service || true
+  - systemctl restart nginx || true

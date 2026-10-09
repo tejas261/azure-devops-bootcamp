@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Namespace
+metadata: {name: s8}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: portal, namespace: s8}
+spec:
+  replicas: 2
+  selector: {matchLabels: {app: portal}}
+  template:
+    metadata: {labels: {app: portal}}
+    spec:
+      containers:
+        - name: portal
+          image: nginx:1.27-alpine
+          volumeMounts: [{name: cfg, mountPath: /etc/portal}]
+          env:
+            - name: API_TOKEN
+              valueFrom: {secretKeyRef: {name: portal-secrets, key: token}}
+      volumes:
+        - name: cfg
+          configMap: {name: portal-config}

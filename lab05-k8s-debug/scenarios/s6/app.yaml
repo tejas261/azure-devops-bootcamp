@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Namespace
+metadata: {name: s6}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: api, namespace: s6}
+spec:
+  replicas: 3
+  strategy: {rollingUpdate: {maxUnavailable: 0, maxSurge: 1}}
+  selector: {matchLabels: {app: api}}
+  template:
+    metadata: {labels: {app: api}}
+    spec:
+      containers:
+        - name: api
+          image: nginx:1.27-alpine
+          ports: [{containerPort: 80}]
+          readinessProbe:
+            httpGet: {path: /healthz, port: 80}
+            periodSeconds: 5
+            failureThreshold: 2
+---
+apiVersion: v1
+kind: Service
+metadata: {name: api, namespace: s6}
+spec:
+  selector: {app: api}
+  ports: [{port: 80, targetPort: 80}]

@@ -1,0 +1,52 @@
+# BROKEN ON PURPOSE. Put in .github/workflows/ of YOUR repo, push, read the Actions logs.
+name: build-and-deploy
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+env:
+  ACR_NAME: REPLACE_ME
+  IMAGE: orders
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: [3.10, 3.12, 3.13]
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install -r requirements-dev.txt
+      - run: pytest
+
+  build:
+    runs-on: ubuntu-latest
+    needs: tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - run: az acr login --name ${{ env.ACR_NAME }}
+      - run: |
+          docker build -t $ACR_NAME.azurecr.io/$IMAGE:${{ github.sha }} .
+          docker push $ACR_NAME.azurecr.io/$IMAGE:${{ github.sha }}
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'main'
+    environment: production
+    steps:
+      - uses: azure/aks-set-context@v4
+        with:
+          resource-group: rg-bootcamp-platform
+          cluster-name: aks-bootcamp
+      - run: |
+          kubectl -n orders-prod set image deploy/orders orders=$ACR_NAME.azurecr.io/$IMAGE:${{ github.sha }}
+          kubectl -n orders-prod rollout status deploy/orders

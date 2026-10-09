@@ -1,0 +1,66 @@
+// BROKEN ON PURPOSE. Do not "fix by reading": run it and use the console output.
+pipeline {
+    agent none
+
+    environment {
+        ACR_NAME     = 'myacrname'
+        IMAGE        = "${ACR_NAME}.azurecr.io/orders"
+        ACR_PASSWORD = 'P@ssw0rd-hardcoded'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'main', url: 'https://github.com/your-org/your-repo.git'
+            }
+        }
+
+        stage('Test') {
+            agent { docker { image 'python:3.12-slim' } }
+            steps {
+                sh 'pip install -r requirements-dev.txt'
+                sh 'pytest --junitxml=report.xml'
+            }
+            post {
+                always { junit 'reports.xml' }
+            }
+        }
+
+        stage('Build') {
+            agent any
+            steps {
+                sh 'docker build -t $IMAGE:$GIT_COMMIT_SHORT .'
+            }
+        }
+
+        stage('Push') {
+            when { branch 'master' }
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'acr-creds', usernameVariable: 'U', passwordVariable: 'P')]) {
+                    sh 'echo $P | docker login $ACR_NAME.azurecr.io -u $U --password-stdin'
+                    sh 'docker push ${IMAGE}:${GIT_COMMIT_SHORT}'
+                }
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                script {
+                    def tag = sh(script: 'git rev-parse --short HEAD', returnStdout: true)
+                    sh "kubectl -n orders-dev set image deploy/orders orders=${IMAGE}:${tag}"
+                    sh "kubectl -n orders-dev rollout status deploy/orders --timeout=60s"
+                }
+            }
+        }
+        stage('Approve') {
+            steps {
+                input message: 'Deploy to prod?'
+                sh "kubectl -n orders-prod set image deploy/orders orders=$IMAGE:latest"
+            }
+        }
+    }
+    post {
+        success { echo "Deployed ${env.BUILD_NUMBER}" }
+        failure { mail to: 'team@example.com', subject: 'failed' }
+    }
+}

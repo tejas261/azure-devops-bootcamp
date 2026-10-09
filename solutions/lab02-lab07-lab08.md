@@ -1,0 +1,5 @@
+# Labs 02, 07, 08 — no answer keys on purpose
+Those are design/setup labs. Check yourself against the references:
+- Lab 02: compare your modules with `../platform/main.tf`. D1: `terraform force-unlock <id>` only if you've confirmed no run is active. D3: `terraform import azurerm_x.y <resource-id>`. D4: `moved { from = a.b  to = a.c }`.
+- Lab 07: error budget for 99.5%/30d = 0.5% of 43,200 min = **216 minutes**. Burn-rate alert (SRE workbook): page when 14.4x burn over 1h AND 5m; ticket when 6x over 6h AND 30m. Multi-window avoids paging on blips and still catches fast burns.
+- Lab 08: expect Checkov findings for public blob access, TLS<1.2, https-only off, 0.0.0.0/0 NSG on 22/3389, KV purge protection/RBAC, AKS RBAC/API server ranges, ACR admin enabled, hardcoded default password. SOC 2 Type 1 = controls designed at a point in time; Type 2 = controls operated effectively over a period (usually 3-12 months). "Readiness" = gap assessment + remediation + evidence collection before the audit; it is not a certification.

@@ -1,0 +1,23 @@
+# STARTER. Extend it. Goal: after you fix the VM by hand, encode the fixes so a rebuilt VM needs no manual work.
+- hosts: lab
+  become: true
+  tasks:
+    - name: nginx installed
+      ansible.builtin.apt: {name: nginx, state: present, update_cache: true}
+    - name: shop config
+      ansible.builtin.copy:
+        dest: /etc/nginx/conf.d/shop.conf
+        content: |
+          server {
+              listen 80 default_server;
+              server_name _;
+              location / { return 200 "shop ok\n"; }
+          }
+      notify: reload nginx
+    # TODO: payments-worker executable bit + service enabled
+    # TODO: disable/mask the runaway service
+    # TODO: logrotate + disk usage alert cron (use df threshold)
+    # TODO: SSH hardening (PasswordAuthentication no), unattended-upgrades, ufw/nsg parity
+  handlers:
+    - name: reload nginx
+      ansible.builtin.service: {name: nginx, state: reloaded}

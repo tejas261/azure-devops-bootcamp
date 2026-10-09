@@ -1,0 +1,27 @@
+# Applies to namespace orders-dev. Task: understand every line, then add the missing latency SLO alert.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata: {name: orders, namespace: orders-dev}
+spec:
+  selector: {matchLabels: {app: orders}}
+  podMetricsEndpoints:
+    - {port: http, path: /metrics, interval: 15s}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata: {name: orders-slo, namespace: orders-dev}
+spec:
+  groups:
+    - name: orders.slo
+      rules:
+        - record: orders:error_ratio:rate5m
+          expr: |
+            sum(rate(http_requests_total{namespace="orders-dev",status=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total{namespace="orders-dev"}[5m]))
+        - alert: OrdersHighErrorRate
+          expr: orders:error_ratio:rate5m > 0.05
+          for: 5m
+          labels: {severity: page}
+          annotations:
+            summary: "orders error ratio above 5% for 5m"
